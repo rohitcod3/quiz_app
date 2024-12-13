@@ -48,19 +48,15 @@ class Command(BaseCommand):
     def register_user(self):
         username = input("Enter a username: ").strip()
         password = input("Enter a password: ").strip()
-
         if User.objects.filter(username=username).exists():
             self.stdout.write("Username already exists!")
         else:
-            user = User(username=username, password=password)
-            user.save()  # Save the user to the database
-            print(f"DEBUG: New User PK: {user.pk}, Username: {user.username}")
+            User.objects.create(username=username, password=password)
             self.stdout.write("Registration successful!")
 
     def login_user(self):
         username = input("Enter your username: ").strip()
         password = input("Enter your password: ").strip()
-
         try:
             user = User.objects.get(username=username, password=password)
             self.stdout.write("Login successful!")
@@ -70,50 +66,50 @@ class Command(BaseCommand):
             return None
 
     def run_quiz(self, user):
-     print(f"DEBUG: User PK: {user.pk}, Username: {user.username}")
-    
-    # Ensure user.pk is a valid string representation of ObjectId
-     if not isinstance(user.pk, str):
-        user.pk = str(user.pk)
-    
-     user.refresh_from_db()  # Refresh user object to ensure it's valid
-     print(f"DEBUG: Refreshed User PK: {user.pk}, Username: {user.username}")
+        questions = list(Question.objects.all())
+        if not questions:
+            self.stdout.write("No questions available.")
+            return
 
-     questions = list(Question.objects.all())
-     if not questions:
-        self.stdout.write("No questions available.")
-        return
+        random.shuffle(questions)
+        selected_questions = questions[:5]
+        score = 0
 
-     random.shuffle(questions)
-     selected_questions = questions[:5]
-     score = 0
+        for question in selected_questions:
+            self.stdout.write(f"\nQuestion: {question.text}")
+            options = [question.option_a, question.option_b, question.option_c, question.option_d]
+            for idx, option in enumerate(options, start=1):
+                self.stdout.write(f"{idx}. {option}")
 
-     for question in selected_questions:
-        self.stdout.write(f"\nQuestion: {question.text}")
-        options = [question.option_a, question.option_b, question.option_c, question.option_d]
-        for idx, option in enumerate(options, start=1):
-            self.stdout.write(f"{idx}. {option}")
+            while True:
+                try:
+                    answer = int(input("Your answer (1/2/3/4): ").strip())
+                    if 1 <= answer <= 4:
+                        if options[answer - 1] == getattr(question, f"option_{question.correct_option.lower()}"):
+                            score += 1
+                        break
+                    else:
+                        self.stdout.write("Please enter a valid option (1/2/3/4).")
+                except ValueError:
+                    self.stdout.write("Invalid input. Please enter a number (1/2/3/4).")
 
-        while True:
-            try:
-                answer = int(input("Your answer (1/2/3/4): ").strip())
-                if 1 <= answer <= 4:
-                    if options[answer - 1] == question.correct_option:
-                        score += 1
-                    break
-                else:
-                    self.stdout.write("Please enter a valid option (1/2/3/4).")
-            except ValueError:
-                self.stdout.write("Invalid input. Please enter a number (1/2/3/4).")
+        QuizResult.objects.create(user=user, score=score)
+        self.stdout.write(f"\nYour score: {score}/5")
 
-     QuizResult.objects.create(user=user, score=score)
-     self.stdout.write(f"\nYour score: {score}/5")
+        if score <= 2:
+            self.stdout.write("Please try again!")
+        elif score == 3:
+            self.stdout.write("Good job!")
+        elif score == 4:
+            self.stdout.write("Excellent work!")
+        elif score == 5:
+            self.stdout.write("You are a genius!")
 
-     if score <= 2:
-        self.stdout.write("Please try again!")
-     elif score == 3:
-        self.stdout.write("Good job!")
-     elif score == 4:
-        self.stdout.write("Excellent work!")
-     elif score == 5:
-        self.stdout.write("You are a genius!")
+    def view_results(self, user):
+        results = QuizResult.objects.filter(user=user).order_by('-timestamp')  # Fetch results sorted by the latest
+        if not results.exists():
+            self.stdout.write("No results found.")
+        else:
+            self.stdout.write("\nYour Past Results:")
+            for result in results:
+                self.stdout.write(f"Score: {result.score}/5, Date: {result.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")

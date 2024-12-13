@@ -1,13 +1,21 @@
 from django.db import models
-from djongo.models.fields import ObjectIdField  # Import ObjectIdField for MongoDB compatibility
+from bson import ObjectId
+
+def generate_object_id():
+    return str(ObjectId())
 
 class QuizUser(models.Model):
-    id = ObjectIdField(primary_key=True)  # Define ObjectIdField as the primary key
+    id = models.CharField(primary_key=True, max_length=24, default=generate_object_id)
     username = models.CharField(max_length=50, unique=True)
     password = models.CharField(max_length=50)
 
     def __str__(self):
         return self.username
+
+
+    class Meta:
+        db_table = "quiz_quizuser"  # Explicitly set the table name
+
 
 class Question(models.Model):
     text = models.TextField()

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path  # Removed the trailing comma
 from . import views
 
 urlpatterns = [
